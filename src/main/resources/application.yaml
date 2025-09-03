@@ -4,3 +4,6 @@ ktor:
             - com.example.ApplicationKt.module
     deployment:
         port: 8080
+# shutdown url: ktor/ktor-server/ktor-server-core/jvm/src/io/ktor/server/engine/ShutDownUrl.kt
+        shutdown:
+            url: /shutdown
