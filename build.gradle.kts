@@ -12,7 +12,9 @@ application {
 
 dependencies {
     implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.call.logging)
     implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.call.id)
     implementation(libs.logback.classic)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.config.yaml)
