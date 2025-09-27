@@ -1,26 +1,39 @@
 package com.example
 
-import io.ktor.callid.KtorCallIdContextElement
-import io.ktor.http.CacheControl
-import io.ktor.http.ContentType
-import io.ktor.http.content.OutgoingContent
+import freemarker.cache.ClassTemplateLoader
+import io.ktor.callid.*
+import io.ktor.http.*
+import io.ktor.http.content.*
+import io.ktor.i18n.*
 import io.ktor.server.application.*
-import io.ktor.server.http.content.CachingOptions
-import io.ktor.server.plugins.cachingheaders.CachingHeaders
-import io.ktor.server.plugins.callid.CallId
-import io.ktor.server.plugins.callid.callIdMdc
-import io.ktor.server.plugins.callid.generate
-import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.freemarker.*
+import io.ktor.server.html.*
+import io.ktor.server.plugins.autohead.*
+import io.ktor.server.plugins.bodylimit.*
+import io.ktor.server.plugins.cachingheaders.*
+import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.calllogging.*
+import io.ktor.server.plugins.compression.*
+import io.ktor.server.plugins.conditionalheaders.*
+import io.ktor.server.plugins.dataconversion.*
+import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.plugins.partialcontent.*
+import io.ktor.server.plugins.ratelimit.*
+import io.ktor.server.plugins.requestvalidation.*
+import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.utils.io.ByteChannel
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.read
-import io.ktor.utils.io.writeStringUtf8
+import io.ktor.server.util.*
+import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.html.*
 import org.slf4j.event.Level
+import java.time.LocalDate
+import java.util.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 fun Application.configureRouting() {
     install(CallLogging) {
@@ -41,11 +54,13 @@ fun Application.configureRouting() {
                         maxAgeSeconds = 3600
                     )
                 )
+
                 ContentType.Text.Html -> io.ktor.http.content.CachingOptions(
                     CacheControl.MaxAge(
                         maxAgeSeconds = 60
                     )
                 )
+
                 else -> null
             }
         }
@@ -58,6 +73,35 @@ fun Application.configureRouting() {
         generate(10)
         verify { callId: String ->
             callId.isNotEmpty()
+        }
+    }
+
+    install(RateLimit) {
+        global {
+            rateLimiter(
+                limit = 2,
+                refillPeriod = 15.seconds
+            )
+        }
+//        register(name = RateLimitName("CustomLimit")) {
+//
+//        }
+    }
+
+//    install(DataConversion) {
+//    }
+
+//    install(I18n) {
+//        availableLanguages = listOf("en-US", "pt-BR")
+//        defaultLanguage = "en-US"
+//    }
+
+    install(StatusPages) {
+        exception<CustomException> { call, cause ->
+            call.respond(
+                HttpStatusCode.UnprocessableEntity,
+                mapOf("message" to "validation failed")
+            )
         }
     }
 
@@ -107,5 +151,154 @@ fun Application.configureRouting() {
 
             call.respond(content)
         }
+
+        route("/limit") {
+            install(RequestBodyLimit) {
+                bodyLimit {
+                    5
+                }
+            }
+            get("max") {
+                call.respond("max limitation 5 byte")
+            }
+        }
+
+        route("/head") {
+            install(AutoHeadResponse)
+
+            get {
+                call.respond("auto head response")
+            }
+        }
+
+        route("/condition") {
+            install(ConditionalHeaders) {
+                version { call, outgoingContent ->
+                    listOf(
+                        EntityTagVersion("abc123"),
+                        LastModifiedVersion(Date(1646387527500))
+                    )
+                }
+            }
+
+            get {
+                call.respondText("Hello, world!")
+            }
+        }
+
+        route("/compression") {
+            install(Compression) {
+                gzip {
+                    priority = 0.9
+                }
+                deflate()
+            }
+
+            get {
+                call.respond(
+                    buildString {
+                        repeat(100) {
+                            append("AAA")
+                        }
+                    }
+                )
+            }
+        }
+
+        route("/param") {
+            get {
+                val id: Int by call.request.queryParameters
+                call.respond("id passed: $id")
+            }
+        }
+
+        route("default_header") {
+            install(DefaultHeaders)
+
+            get {
+                call.respond("Default Header result")
+            }
+        }
+
+        route("freemarker") {
+            install(FreeMarker) {
+                templateLoader = ClassTemplateLoader(this::class.java.classLoader, "templates")
+            }
+            get {
+                call.respond(
+                    FreeMarkerContent(
+                        "hello.ftl",
+                        mapOf(
+                            "user" to "ABVVC",
+                            "date" to LocalDate.now()
+                        )
+                    )
+                )
+            }
+        }
+
+        route("html_builder") {
+            get {
+                call.respondHtml {
+                    body {
+                        div {
+                            a("https://kotlinlang.org") {
+                                target = ATarget.blank
+                                +"Main site"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        route("partial") {
+            install(PartialContent)
+
+            get {
+                val channel = ByteChannel()
+                launch {
+                    delay(2000)
+                    channel.writeStringUtf8("12345123451234512345")
+                    channel.close()
+                }
+
+                call.respond(
+                    object : OutgoingContent.ReadChannelContent() {
+                        override fun readFrom(): ByteReadChannel = channel
+                        override val contentLength: Long = 20
+                        override val contentType: ContentType = ContentType.Text.Plain
+                    }
+                )
+            }
+        }
+
+        route("limit") {
+            get {
+                call.respond("limit")
+            }
+        }
+
+        route("reqValidation") {
+            install(RequestValidation) {
+                validate<String> {
+                    ValidationResult.Valid
+                }
+            }
+
+            get {
+                call.respond("result")
+            }
+        }
+
+        route("custom_exception") {
+
+            get {
+                throw CustomException()
+            }
+        }
     }
 }
+
+
+class CustomException : Throwable()
