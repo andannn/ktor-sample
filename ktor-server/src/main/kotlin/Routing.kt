@@ -328,6 +328,12 @@ fun Application.configureRouting() {
                 )
             }
         }
+
+        route("error_code") {
+            get {
+                call.respond(HttpStatusCode.BadRequest, "custom_error")
+            }
+        }
     }
 }
 

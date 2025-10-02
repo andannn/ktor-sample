@@ -3,7 +3,9 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.engine.okhttp.OkHttpConfig
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.cache.HttpCache
+import io.ktor.client.plugins.compression.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
@@ -13,7 +15,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
-import io.ktor.http.HttpHeaders
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -22,7 +25,9 @@ suspend fun main() {
 //    logging()
 //    memoryCache()
 //    responseContentNegotiation()
-    requestBodyContentNegotiation()
+//    requestBodyContentNegotiation()
+    encodingResponse()
+//    respondErrorHandler()
 }
 
 private fun HttpClientConfig<*>.loggingConfig() {
@@ -103,6 +108,42 @@ suspend fun requestBodyContentNegotiation() {
             header(HttpHeaders.ContentType, "application/json")
             setBody(Request("bar"))
         }
+            .body<String>()
+            .also {
+                println("Response$1:   $it")
+            }
+    }
+}
+
+suspend fun encodingResponse() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+
+        install(ContentEncoding) {
+            gzip()
+        }
+    }.use { client ->
+        client.get("http://localhost:8082/compression")
+            .body<String>()
+            .also {
+                println("Response$1:   $it")
+            }
+    }
+}
+
+suspend fun respondErrorHandler() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+
+        install(HttpCallValidator) {
+            validateResponse { response ->
+                if (response.status == HttpStatusCode.BadRequest) {
+                    throw IllegalStateException("Custom error")
+                }
+            }
+        }
+    }.use { client ->
+        client.get("http://localhost:8082/error_code")
             .body<String>()
             .also {
                 println("Response$1:   $it")
