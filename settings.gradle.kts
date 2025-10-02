@@ -5,3 +5,6 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
+
+include("ktor-client")
+include("ktor-server")

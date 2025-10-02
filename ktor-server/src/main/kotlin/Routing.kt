@@ -23,6 +23,7 @@ import io.ktor.server.plugins.partialcontent.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.plugins.requestvalidation.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.receive
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
@@ -31,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.html.*
+import kotlinx.serialization.Serializable
 import org.slf4j.event.Level
 import java.time.LocalDate
 import java.util.*
@@ -51,13 +53,13 @@ fun Application.configureRouting() {
         options { call, content ->
             val type = content.contentType?.withoutParameters()
             when (type) {
-                ContentType.Text.Plain -> io.ktor.http.content.CachingOptions(
+                ContentType.Text.Plain -> CachingOptions(
                     CacheControl.MaxAge(
                         maxAgeSeconds = 3600
                     )
                 )
 
-                ContentType.Text.Html -> io.ktor.http.content.CachingOptions(
+                ContentType.Text.Html -> CachingOptions(
                     CacheControl.MaxAge(
                         maxAgeSeconds = 60
                     )
@@ -81,8 +83,8 @@ fun Application.configureRouting() {
     install(RateLimit) {
         global {
             rateLimiter(
-                limit = 2,
-                refillPeriod = 15.seconds
+                limit = 200,
+                refillPeriod = 2000.seconds
             )
         }
 //        register(name = RateLimitName("CustomLimit")) {
@@ -306,11 +308,33 @@ fun Application.configureRouting() {
             }
 
             get {
-                call.respond(mapOf("hello" to "world"))
+                call.respond(
+                    CustomResponse(
+                        message = "ok",
+                        code = 200
+                    )
+                )
+            }
+
+            post("/withbody") {
+                @Serializable
+                data class Request(val foo: String)
+
+                log.info("content_negotiation/withbody called")
+                val req = call.receive<Request>()
+                log.info("content_negotiation/withbody called ${req.foo}")
+                call.respond(
+                    "receive: ${req.foo}"
+                )
             }
         }
     }
 }
 
+@Serializable
+data class CustomResponse(
+    val message: String,
+    val code: Int,
+)
 
 class CustomException : Throwable()
