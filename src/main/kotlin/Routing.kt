@@ -5,6 +5,7 @@ import io.ktor.callid.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.i18n.*
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
 import io.ktor.server.freemarker.*
 import io.ktor.server.html.*
@@ -15,6 +16,7 @@ import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.conditionalheaders.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.dataconversion.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.partialcontent.*
@@ -295,6 +297,16 @@ fun Application.configureRouting() {
 
             get {
                 throw CustomException()
+            }
+        }
+
+        route("content_negotiation") {
+            install(ContentNegotiation) {
+                json()
+            }
+
+            get {
+                call.respond(mapOf("hello" to "world"))
             }
         }
     }

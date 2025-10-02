@@ -22,6 +22,8 @@ dependencies {
     implementation(libs.ktor.server.data.conversion)
     implementation(libs.ktor.server.default.headers)
     implementation(libs.ktor.server.freemarker)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.server.html.builder)
     implementation(libs.ktor.server.http.redirect)
     implementation(libs.ktor.server.partial.content)
