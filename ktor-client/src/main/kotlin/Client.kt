@@ -2,23 +2,27 @@ import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.engine.okhttp.OkHttpConfig
-import io.ktor.client.plugins.*
+import io.ktor.client.plugins.HttpCallValidator
 import io.ktor.client.plugins.cache.HttpCache
-import io.ktor.client.plugins.compression.*
+import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.sse.SSE
+import io.ktor.client.plugins.sse.SSEBufferPolicy
+import io.ktor.client.plugins.sse.sse
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 suspend fun main() {
@@ -26,8 +30,11 @@ suspend fun main() {
 //    memoryCache()
 //    responseContentNegotiation()
 //    requestBodyContentNegotiation()
-    encodingResponse()
+//    encodingResponse()
 //    respondErrorHandler()
+//    sseResponse()
+//    sseResponseAndCancel()
+    sseResponseLateCollect()
 }
 
 private fun HttpClientConfig<*>.loggingConfig() {
@@ -126,7 +133,7 @@ suspend fun encodingResponse() {
         client.get("http://localhost:8082/compression")
             .body<String>()
             .also {
-                println("Response$1:   $it")
+                println("Response$1: $it")
             }
     }
 }
@@ -148,5 +155,64 @@ suspend fun respondErrorHandler() {
             .also {
                 println("Response$1:   $it")
             }
+    }
+}
+
+
+suspend fun sseResponse() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+        install(SSE) {
+            showCommentEvents()
+            showRetryEvents()
+        }
+    }.use { client ->
+        client.sse("http://0.0.0.0:8082/sse") {
+            incoming.collect {
+                println("Event: ${it.data}")
+            }
+        }
+    }
+}
+
+suspend fun sseResponseAndCancel() = coroutineScope {
+    val job = launch {
+        HttpClient(OkHttp) {
+            loggingConfig()
+            install(SSE) {
+                showCommentEvents()
+                showRetryEvents()
+            }
+        }.use { client ->
+            client.sse("http://0.0.0.0:8082/sse") {
+                incoming.collect {
+                    println("Event: ${it.data}")
+                }
+            }
+        }
+    }
+
+    delay(3500)
+    println("Cancel SSE")
+    job.cancel()
+}
+
+suspend fun sseResponseLateCollect() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+        install(SSE) {
+//            showCommentEvents()
+//            showRetryEvents()
+
+            bufferPolicy = SSEBufferPolicy.LastEvent
+        }
+    }.use { client ->
+        client.sse("http://0.0.0.0:8082/sse") {
+            delay(4000)
+            println("Start collecting ")
+            incoming.collect {
+                println("Event: ${it.data}")
+            }
+        }
     }
 }

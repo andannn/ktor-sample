@@ -38,6 +38,7 @@ dependencies {
     implementation(libs.ktor.server.config.yaml)
     implementation(libs.ktor.client.mock)
     implementation(libs.ktor.server.caching.headers)
+    implementation(libs.ktor.server.sse)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }
