@@ -1,5 +1,7 @@
 package com.example
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import freemarker.cache.ClassTemplateLoader
 import io.ktor.callid.*
 import io.ktor.http.*
@@ -12,6 +14,7 @@ import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.basic
 import io.ktor.server.auth.digest
+import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.auth.principal
 import io.ktor.server.freemarker.*
@@ -50,6 +53,14 @@ import java.time.LocalDate
 import java.util.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+
+object JWTConfig {
+    val secret = "secret"
+    val issuer = "http://0.0.0.0:8082/"
+    val audience = "http://0.0.0.0:8080/hello"
+    val myRealm = "Access to 'hello'"
+}
+
 
 fun Application.configureRouting() {
     install(CallLogging) {
@@ -140,8 +151,24 @@ fun Application.configureRouting() {
             }
         }
 
-        jwt(name = "auth-jwt") {
-
+        jwt("auth-jwt") {
+            realm = JWTConfig.myRealm
+            verifier(
+                JWT
+                .require(Algorithm.HMAC256(JWTConfig.secret))
+                .withAudience(JWTConfig.audience)
+                .withIssuer(JWTConfig.issuer)
+                .build())
+            validate { credential ->
+                if (credential.payload.getClaim("username").asString() != "") {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
+            }
+            challenge { defaultScheme, realm ->
+                call.respond(HttpStatusCode.Unauthorized, "Token is not valid or has expired")
+            }
         }
     }
 
@@ -415,6 +442,34 @@ fun Application.configureRouting() {
                 }
             }
         }
+
+        route("jwt_auth") {
+            install(ContentNegotiation) {
+                json()
+            }
+
+            post("/login") {
+                val user = call.receive<User>()
+                // Check username and password
+                // ...
+                val token = JWT.create()
+                    .withAudience(JWTConfig.audience)
+                    .withIssuer(JWTConfig.issuer)
+                    .withClaim("username", user.username)
+                    .withExpiresAt(Date(System.currentTimeMillis() + 60000))
+                    .sign(Algorithm.HMAC256(JWTConfig.secret))
+                call.respond(hashMapOf("token" to token))
+            }
+
+            authenticate("auth-jwt") {
+                get("/hello") {
+                    val principal = call.principal<JWTPrincipal>()
+                    val username = principal!!.payload.getClaim("username").asString()
+                    val expiresAt = principal.expiresAt?.time?.minus(System.currentTimeMillis())
+                    call.respondText("Hello, $username! Token is expired at $expiresAt ms.")
+                }
+            }
+        }
     }
 }
 
@@ -427,3 +482,6 @@ data class CustomResponse(
 class CustomException : Throwable()
 
 data class CustomPrincipal(val userName: String, val realm: String)
+
+@Serializable
+data class User(val username: String, val password: String)

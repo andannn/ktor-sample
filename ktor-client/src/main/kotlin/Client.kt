@@ -5,6 +5,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpCallValidator
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
+import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.DigestAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.auth.providers.bearer
@@ -42,7 +43,8 @@ suspend fun main() {
 //    sseResponseAndCancel()
 //    sseResponseLateCollect()
 //    basicAuth()
-    digestAuth()
+//    digestAuth()
+    jwtBearerAuth()
 }
 
 private fun HttpClientConfig<*>.loggingConfig() {
@@ -267,25 +269,47 @@ suspend fun digestAuth() {
             }
     }
 }
-//
-//suspend fun jwtBearerAuth() {
-//    HttpClient(OkHttp) {
-//        loggingConfig()
-//
-//        install(Auth) {
-//            bearer {
-//                sendWithoutRequest {
-//
-//                }
-//            }
-//        }
-//    }.use { client ->
-//        client.get("http://0.0.0.0:8082/digest_auth")
-//            .body<String>()
-//            .also {
-//                println("Response$1:   $it")
-//            }
-//    }
-//}
-//
+
+suspend fun jwtBearerAuth() {
+    @Serializable
+    data class User(val username: String, val password: String)
+
+    var token: String? = null
+
+    HttpClient(OkHttp) {
+        loggingConfig()
+        install(ContentNegotiation) {
+            json()
+        }
+
+        install(Auth) {
+            bearer {
+                loadTokens {
+                    token?.let {
+                        BearerTokens(
+                            accessToken = it,
+                            refreshToken = null,
+                        )
+                    }
+                }
+            }
+        }
+    }.use { client ->
+        client.post("http://0.0.0.0:8082/jwt_auth/login") {
+            header(HttpHeaders.ContentType, "application/json")
+            setBody(User("jetbrains", "foobar"))
+        }.body<Map<String, String>>().also {
+            token = it["token"]
+
+            println("Token: $token")
+        }
+
+        client.get("http://0.0.0.0:8082/jwt_auth/hello")
+            .body<String>()
+            .also {
+                println("Response$1:   $it")
+            }
+    }
+}
+
 
