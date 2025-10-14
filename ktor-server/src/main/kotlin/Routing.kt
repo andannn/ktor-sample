@@ -11,6 +11,7 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.basic
+import io.ktor.server.auth.digest
 import io.ktor.server.auth.principal
 import io.ktor.server.freemarker.*
 import io.ktor.server.html.*
@@ -42,6 +43,8 @@ import kotlinx.coroutines.launch
 import kotlinx.html.*
 import kotlinx.serialization.Serializable
 import org.slf4j.event.Level
+import java.nio.charset.StandardCharsets.UTF_8
+import java.security.MessageDigest
 import java.time.LocalDate
 import java.util.*
 import kotlin.time.Duration
@@ -106,6 +109,30 @@ fun Application.configureRouting() {
             validate { credentials ->
                 if (credentials.name == "jetbrains" && credentials.password == "foobar") {
                     UserIdPrincipal(credentials.name)
+                } else {
+                    null
+                }
+            }
+        }
+
+
+        digest("auth-digest") {
+
+            fun getMd5Digest(str: String): ByteArray = MessageDigest.getInstance("MD5").digest(str.toByteArray(UTF_8))
+
+            val myRealm = "Access to the '/' path"
+            val userTable: Map<String, ByteArray> = mapOf(
+                "jetbrains" to getMd5Digest("jetbrains:$myRealm:foobar"),
+                "admin" to getMd5Digest("admin:$myRealm:password")
+            )
+
+            realm = myRealm
+            digestProvider { userName, realm ->
+                userTable[userName]
+            }
+            validate { credentials ->
+                if (credentials.userName.isNotEmpty()) {
+                    CustomPrincipal(credentials.userName, credentials.realm)
                 } else {
                     null
                 }
@@ -375,6 +402,14 @@ fun Application.configureRouting() {
                 }
             }
         }
+
+        route("digest_auth") {
+            authenticate("auth-digest") {
+                get {
+                    call.respondText("Hello, ${call.principal<CustomPrincipal>()?.userName}!")
+                }
+            }
+        }
     }
 }
 
@@ -385,3 +420,5 @@ data class CustomResponse(
 )
 
 class CustomException : Throwable()
+
+data class CustomPrincipal(val userName: String, val realm: String)

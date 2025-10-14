@@ -5,7 +5,9 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpCallValidator
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
+import io.ktor.client.plugins.auth.providers.DigestAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
+import io.ktor.client.plugins.auth.providers.digest
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -38,7 +40,8 @@ suspend fun main() {
 //    sseResponse()
 //    sseResponseAndCancel()
 //    sseResponseLateCollect()
-    basicAuth()
+//    basicAuth()
+    digestAuth()
 }
 
 private fun HttpClientConfig<*>.loggingConfig() {
@@ -242,3 +245,25 @@ suspend fun basicAuth() {
             }
     }
 }
+
+suspend fun digestAuth() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+
+        install(Auth) {
+            digest {
+                credentials {
+                    DigestAuthCredentials(username = "jetbrains", password = "foobar")
+                }
+                realm = "Access to the '/' path"
+            }
+        }
+    }.use { client ->
+        client.get("http://0.0.0.0:8082/digest_auth")
+            .body<String>()
+            .also {
+                println("Response$1:   $it")
+            }
+    }
+}
+
