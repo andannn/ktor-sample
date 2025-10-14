@@ -7,6 +7,7 @@ import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
 import io.ktor.client.plugins.auth.providers.DigestAuthCredentials
 import io.ktor.client.plugins.auth.providers.basic
+import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.auth.providers.digest
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.compression.ContentEncoding
@@ -266,4 +267,25 @@ suspend fun digestAuth() {
             }
     }
 }
+//
+//suspend fun jwtBearerAuth() {
+//    HttpClient(OkHttp) {
+//        loggingConfig()
+//
+//        install(Auth) {
+//            bearer {
+//                sendWithoutRequest {
+//
+//                }
+//            }
+//        }
+//    }.use { client ->
+//        client.get("http://0.0.0.0:8082/digest_auth")
+//            .body<String>()
+//            .also {
+//                println("Response$1:   $it")
+//            }
+//    }
+//}
+//
 

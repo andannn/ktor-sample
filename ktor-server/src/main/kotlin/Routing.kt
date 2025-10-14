@@ -12,6 +12,7 @@ import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.basic
 import io.ktor.server.auth.digest
+import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.auth.principal
 import io.ktor.server.freemarker.*
 import io.ktor.server.html.*
@@ -137,6 +138,10 @@ fun Application.configureRouting() {
                     null
                 }
             }
+        }
+
+        jwt(name = "auth-jwt") {
+
         }
     }
 
