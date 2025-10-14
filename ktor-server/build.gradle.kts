@@ -31,6 +31,7 @@ dependencies {
     implementation(libs.ktor.server.partial.content)
     implementation(libs.ktor.server.rate.limit)
     implementation(libs.ktor.server.i18n)
+    implementation(libs.ktor.server.auth)
     implementation(libs.ktor.server.request.validation)
     implementation(libs.ktor.server.status.pages)
     implementation(libs.logback.classic)

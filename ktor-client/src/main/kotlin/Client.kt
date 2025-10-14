@@ -3,6 +3,9 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpCallValidator
+import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.providers.BasicAuthCredentials
+import io.ktor.client.plugins.auth.providers.basic
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -34,7 +37,8 @@ suspend fun main() {
 //    respondErrorHandler()
 //    sseResponse()
 //    sseResponseAndCancel()
-    sseResponseLateCollect()
+//    sseResponseLateCollect()
+    basicAuth()
 }
 
 private fun HttpClientConfig<*>.loggingConfig() {
@@ -214,5 +218,27 @@ suspend fun sseResponseLateCollect() {
                 println("Event: ${it.data}")
             }
         }
+    }
+}
+
+suspend fun basicAuth() {
+    HttpClient(OkHttp) {
+        loggingConfig()
+
+        install(Auth) {
+            basic {
+                credentials {
+                    BasicAuthCredentials(username = "jetbrains", password = "foobar")
+                }
+
+                realm = "Access to the '/' path"
+            }
+        }
+    }.use { client ->
+        client.get("http://0.0.0.0:8082/basic_auth")
+            .body<String>()
+            .also {
+                println("Response$1:   $it")
+            }
     }
 }

@@ -7,6 +7,11 @@ import io.ktor.http.content.*
 import io.ktor.i18n.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.basic
+import io.ktor.server.auth.principal
 import io.ktor.server.freemarker.*
 import io.ktor.server.html.*
 import io.ktor.server.plugins.autohead.*
@@ -93,6 +98,19 @@ fun Application.configureRouting() {
 //        register(name = RateLimitName("CustomLimit")) {
 //
 //        }
+    }
+
+    install(Authentication) {
+        basic("auth-basic") {
+            realm = "Access to the '/' path"
+            validate { credentials ->
+                if (credentials.name == "jetbrains" && credentials.password == "foobar") {
+                    UserIdPrincipal(credentials.name)
+                } else {
+                    null
+                }
+            }
+        }
     }
 
 //    install(DataConversion) {
@@ -346,6 +364,14 @@ fun Application.configureRouting() {
                     send(ServerSentEvent("this is SSE #$it"))
                     log.info("sse send #$it")
                     delay(1000)
+                }
+            }
+        }
+
+        route("basic_auth") {
+            authenticate("auth-basic") {
+                get {
+                    call.respondText("Hello, ${call.principal<UserIdPrincipal>()?.name}!")
                 }
             }
         }
